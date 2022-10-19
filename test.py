@@ -1,2 +1,2 @@
 import streamlit as st
-st.title('Классификация изображений')
+st.title('Hello')
