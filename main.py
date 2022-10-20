@@ -17,6 +17,11 @@ DATA_PATH = 'prices_clean.csv'
 TYPES_PATH = 'types_dict.json'
 CV_RESULTS_PATH = 'cv_results.csv'
 MODEL_PATH = 'model.pickle'
+FORECAST_PATH = 'forecast.csv'
+LOWER_PATH = 'forecast_lower.csv'
+UPPER_PATH = 'forecast_upper.csv'
+
+
 N_PREDS = 4
 N_FOLDS = 10
 VAR_PARAMS = {
@@ -26,15 +31,13 @@ VAR_PARAMS = {
 }
 
 def read_data():
-    # Что если нет файла
     try:
         data = pd.read_csv(DATA_PATH, index_col=[0], parse_dates=[0])
         with open(TYPES_PATH) as f:
             types_dict = json.load(f)
             data = data.dropna(axis=1)
     except FileNotFoundError as e:
-        raise e
-        
+        raise e        
 
     # !!!!
     max_date, min_date = data.index.max(), data.index.min()
@@ -55,7 +58,9 @@ def fit(df_train, max_lags, trend='c', exogs_train=None, diff=False, fp=None):
     return model
 
 def predict(model, n_preds, exogs_test=None):
-    forecast = np.array(model.forecast_interval(model.endog[-model.k_ar:], n_preds, exog_future=exogs_test))
+    forecast = np.array(
+        model.forecast_interval(model.endog[-model.k_ar:], n_preds, exog_future=exogs_test)
+        )
     fitted = model.fittedvalues.values
     return fitted, forecast
 
@@ -67,6 +72,30 @@ def restore_diff(df_train, fitted, forecast, max_lags):
     #upper
     forecast[2] = np.r_[df_train.values[-1:, :], forecast[2]].cumsum(axis=0)[1:]
     return fitted, forecast   
+
+def save_forecast(data, fitted, forecast):
+    forecast_date_range = pd.date_range(start=data.index.max(), freq='7D', periods=N_PREDS+1)[1:]
+    yhat_df = pd.DataFrame(
+        np.r_[fitted, forecast[0]],\
+        columns=data.columns,\
+        index=np.r_[data.index[VAR_PARAMS['max_lags']:], forecast_date_range]
+    )
+
+    lower_df = pd.DataFrame(
+        forecast[1],\
+        columns=data.columns,\
+        index=forecast_date_range
+    )
+    upper_df = pd.DataFrame(
+        forecast[2],\
+        columns=data.columns,\
+        index=forecast_date_range
+    )
+    yhat_df.to_csv(FORECAST_PATH)
+    lower_df.to_csv(LOWER_PATH)
+    upper_df.to_csv(UPPER_PATH)
+    print(f'Saved forecast to {FORECAST_PATH}, {LOWER_PATH}, {UPPER_PATH}')
+    return yhat_df, lower_df, upper_df
 
 def cross_validate(df, cv, max_lags, n_preds, trend='c', exogs=None, diff=False):
     train_errors = []
@@ -107,6 +136,8 @@ def cross_validate(df, cv, max_lags, n_preds, trend='c', exogs=None, diff=False)
         test_errors.mean(),\
         test_errors.std()
         ]
+    errors.to_csv(CV_RESULTS_PATH)
+    print(f'Saved CV results to {CV_RESULTS_PATH}')
     del train_data, test_data, train_errors, test_errors
     gc.collect()
     return errors
@@ -122,11 +153,15 @@ def main(refit=False):
         try:
             model = sm.load_pickle(MODEL_PATH)
         except FileNotFoundError as e:
+            print("You either haven't fitted a model yet or changed it's name.")
+            print("Check MODEL_PATH constant in main.py")
             raise e
     fitted, forecast = predict(model, N_PREDS)
     if VAR_PARAMS['diff']:
         fitted, forecast = restore_diff(data, fitted, forecast, VAR_PARAMS['max_lags'])
-    return fitted, forecast
+    _, _, _ = save_forecast(data, fitted, forecast)
+    return
+
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser(description='Evaluate and save forecast')
     parser.add_argument(
@@ -135,8 +170,7 @@ if __name__ == '__main__':
         )
     args = parser.parse_args()
     try:
-        fitted, forecast = main(refit=args.refit)
-        print(fitted.shape, forecast.shape)
+        main(refit=args.refit)
     except Exception as e:
         print(e)
         
