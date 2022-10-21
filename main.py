@@ -1,11 +1,8 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
 import statsmodels.api as sm
-import json
+# import json
 from tqdm import tqdm
 import gc
 import argparse
@@ -33,14 +30,14 @@ VAR_PARAMS = {
 def read_data():
     try:
         data = pd.read_csv(DATA_PATH, index_col=[0], parse_dates=[0])
-        with open(TYPES_PATH) as f:
-            types_dict = json.load(f)
-            data = data.dropna(axis=1)
+        # with open(TYPES_PATH) as f:
+        #     types_dict = json.load(f)
+        data = data.dropna(axis=1)
     except FileNotFoundError as e:
         raise e        
 
     # !!!!
-    max_date, min_date = data.index.max(), data.index.min()
+    max_date = data.index.max()
     data.index = pd.date_range(end=max_date, periods=data.shape[0], freq='7D')
     data = data.sort_index()
     return data
