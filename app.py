@@ -1,8 +1,8 @@
 import streamlit as st
-import argparse
 import pandas as pd
 import json
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 
 CV_RESULTS_PATH = 'cv_results.csv'
 TYPES_PATH = 'types_dict.json'
@@ -54,14 +54,36 @@ def read_forecast():
     return yhat, lower, upper
 
 def plot(yhat, lower, upper, y, name):
-    with plt.style.context('seaborn'):
-        fig, ax = plt.subplots(figsize=(12, 8))
-        ax.plot(y, label='Actual', color='r')
-        ax.plot(yhat, '-o', markersize=5, label='Model', color='g')
-        ax.plot(lower, "r--", alpha=0.5, label = "Predictive interval", color='g')
-        ax.plot(upper, "r--", alpha=0.5, color='g')
-        ax.fill_between(x=upper.index, y1=lower, y2=upper, alpha=0.2, color = "grey")  
-        ax.legend()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=yhat.index, y=yhat,\
+            mode='lines', name='Model',\
+            line_color='green'
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=y.index, y=y,\
+            mode='lines', name='Actual',\
+            line_color='red'
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=lower.index, y=lower,\
+            mode='lines', name='95% interval',\
+            line_color='green'
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+           x=upper.index, y=upper,\
+           mode='lines', name='',\
+           line_color='green'
+        )
+    )
+
     return fig
 
 
